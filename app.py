@@ -208,8 +208,8 @@ HTML_TEMPLATE = """
         <div class="message" style="flex-direction: row;">
             <div class="bot-avatar">S</div>
             <div class="message-content" style="background-color: #1E293B; color: #F1F5F9; border: none;">
-                <strong>I am here to help you generate a professional, weighted home valuation report.</strong><br>
-                Please paste the property details below.
+                I am here to help you generate a professional, weighted home valuation report.<br>
+                Please paste the property details below, (Property Address, Beds / Baths / Finished Sq Ft, Notable Condition & Upgrades, Special Features / Location Notes, Agent Name + Phone)
             </div>
         </div>
 
@@ -285,5 +285,6 @@ if __name__ == "__main__":
     app.run(debug=True)
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
