@@ -197,14 +197,20 @@ HTML_TEMPLATE = """
 <body>
     <div class="header">
         <h1>📊 Simon Valuation Expert</h1>
+        <span>Powered by Agent Coach AI</span>
     </div>
 
     <div class="chat-container">
         <div class="message" style="flex-direction: row;">
             <div class="bot-avatar">S</div>
             <div class="message-content" style="background-color: #1E293B; color: #F1F5F9; border: none;">
-                <strong>System Ready.</strong><br>
-                Please paste the property details below (Address, Specs, Upgrades, Agent Name).<br><br>
+                <strong>I am here to help you generate a professional, weighted home valuation report.</strong><br>
+                Please paste the property details below.<br><br>
+                1. <strong>Full Property Address</strong> (Required)
+2. <strong>Beds / Baths / Sq Ft</strong>
+3. <strong>Condition & Upgrades</strong> (e.g., new roof 2024, remodeled kitchen)
+4. <strong>Special Features</strong> (e.g., cul-de-sac, views)
+5. <strong>Agent Name + Phone</strong> (Required for signature)
                 I will generate a professional <strong>Agent-Ready Report</strong>.
             </div>
         </div>
@@ -265,3 +271,4 @@ def home():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
