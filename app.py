@@ -3,6 +3,8 @@ import os
 import google.generativeai as genai
 from flask import Flask, request, render_template_string
 from dotenv import load_dotenv
+from datetime import datetime
+import markdown # IMPORTANTE: Para convertir los asteriscos en formato real
 
 # --- CONFIGURATION ---
 load_dotenv()
@@ -15,7 +17,7 @@ if api_key:
     genai.configure(api_key=api_key)
 
 # --- SIMON SYSTEM PROMPT (PROFESSIONAL EDITION) ---
-def get_simon_prompt(user_raw_input):
+def get_simon_prompt(user_raw_input, current_date):
     return f"""
     You are **Simon**, the AI-Assisted Home Valuation Expert for AgentCoachAI.com.
     
@@ -23,7 +25,9 @@ def get_simon_prompt(user_raw_input):
     OBJECTIVE
     ====================
     Create a HIGHLY PROFESSIONAL, clean, and visually structured Valuation Report.
-    The output must look like a premium document, not just a chat message.
+    The output must look like a premium document.
+    
+    CURRENT DATE: {current_date}
 
     ====================
     INPUTS
@@ -31,21 +35,20 @@ def get_simon_prompt(user_raw_input):
     {user_raw_input}
 
     ====================
-    CRITICAL INSTRUCTIONS FOR DATA
+    CRITICAL INSTRUCTIONS
     ====================
-    1. **NO "N/A" TABLES:** Since you cannot browse live Zillow/Redfin links in real-time, DO NOT fill the table with "N/A" or broken links. Instead, use your internal market knowledge to generate **"Estimated Algo Ranges"** for these platforms based on the comps you find. Mark them as "Est."
-    2. **COMPS:** Identify 3 specific, realistic comparable sales based on the location. If exact recent sales are hidden, estimate high-confidence proxies based on neighborhood data.
-    3. **MATH:** Ensure the "Adjusted Midpoint" is mathematically consistent with your weighted adjustments.
+    1. **NO HTML TAGS:** Do NOT use tags like <small>, <div>, or <span>. Only use standard Markdown.
+    2. **DATE:** Use the date provided above ({current_date}) for the report.
+    3. **TABLES:** Ensure markdown tables are perfectly aligned so they render correctly.
 
     ====================
     REQUIRED MARKDOWN OUTPUT FORMAT
     ====================
-    (Do not add introductory chat text. Start directly with the report).
-
+    
     # 📑 AI-Assisted Valuation Report
     
     **Property:** {{Address}}
-    **Date:** {{Current Date}}
+    **Date:** {current_date}
     **Prepared For:** {{Agent Name}}
 
     ---
@@ -75,7 +78,7 @@ def get_simon_prompt(user_raw_input):
     * **📍 {{Comp 1 Address}}**
         * {{Beds}}/{{Baths}} • {{SqFt}} sqft
         * **Sold: ${{Price}}** ({{Date}})
-        * *Analysis:* {{Compare to subject, e.g., "Inferior kitchen, similar size"}}
+        * *Analysis:* {{Compare to subject}}
 
     * **📍 {{Comp 2 Address}}**
         * {{Beds}}/{{Baths}} • {{SqFt}} sqft
@@ -95,7 +98,7 @@ def get_simon_prompt(user_raw_input):
     | Metric | Value |
     | :--- | :--- |
     | **Raw Comp Average** | **${{Raw_Midpoint}}** |
-    | **Net Adjustments** | **{{+/- Percentage}}%** ({{Reason for adjustment}}) |
+    | **Net Adjustments** | **{{+/- Percentage}}%** ({{Reason}}) |
     | **Final Adjusted Midpoint** | **${{Final_Midpoint}}** |
 
     ### ✅ Recommended Pricing Strategy
@@ -103,19 +106,20 @@ def get_simon_prompt(user_raw_input):
     # 💰 ${{Low_Range}} – ${{High_Range}}
 
     **Agent Strategy:**
-    {{Provide specific strategic advice. E.g., "To capture the weekend traffic, list at $264,900. If speed is priority..."}}
+    {{Provide specific strategic advice.}}
 
     **Confidence Score:**
-    {{Low/Medium/High}} — {{One sentence rationale}}.
+    {{Low/Medium/High}} — {{Rationale}}.
 
     ---
     *Prepared by Simon — AgentCoachAI.com*
     *Agent: {{Agent Name}} • {{Phone}}*
 
-    <small>DISCLAIMER: This is an AI-assisted estimate using publicly available data. It is not a formal appraisal. Verify all data independently.</small>
+    DISCLAIMER: This is an AI-assisted estimate using publicly available data. It is not a formal appraisal. Verify all data independently.
     """
 
 # --- FRONTEND (PROFESSIONAL DARK UI) ---
+# Se agregó el filtro | safe en el template para renderizar HTML real
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -128,9 +132,7 @@ HTML_TEMPLATE = """
         :root {
             --bg-color: #0F172A;
             --chat-bg: #1E293B;
-            --report-bg: #FFFFFF; /* Report is white for professionalism */
             --text-color: #F1F5F9;
-            --report-text: #334155;
             --accent-color: #38BDF8;
             --input-bg: #334155;
         }
@@ -157,31 +159,33 @@ HTML_TEMPLATE = """
             padding: 15px; 
             border-radius: 12px; 
             line-height: 1.6; 
-            white-space: pre-wrap; 
             width: 100%;
         }
         
-        /* Cuando es el reporte de Simon, cambiamos el estilo para que parezca "Papel" o "Tarjeta Profesional" */
+        /* Cuando es el reporte de Simon */
         .bot-message .message-content {
-            background-color: #F8FAFC; /* White-ish paper */
-            color: #1E293B; /* Dark text for readability */
+            background-color: #F8FAFC; /* Fondo blanco papel */
+            color: #1E293B; /* Texto oscuro */
             border: 1px solid #CBD5E1;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
-        /* Markdown Styling inside the Report */
-        h1 { color: #0F172A; font-size: 1.4em; border-bottom: 2px solid #0EA5E9; padding-bottom: 10px; margin-top: 0; }
-        h2 { color: #2563EB; font-size: 1.1em; margin-top: 25px; margin-bottom: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-        h3 { color: #475569; font-size: 1em; margin-top: 15px; }
+        /* Estilos para el HTML generado desde Markdown */
+        .message-content h1 { color: #0F172A; font-size: 1.5em; border-bottom: 2px solid #0EA5E9; padding-bottom: 10px; margin-top: 0; }
+        .message-content h2 { color: #2563EB; font-size: 1.2em; margin-top: 25px; margin-bottom: 10px; font-weight: 700; text-transform: uppercase; }
+        .message-content h3 { color: #475569; font-size: 1.1em; margin-top: 15px; }
+        .message-content p { margin-bottom: 10px; }
+        .message-content ul { padding-left: 20px; }
+        .message-content li { margin-bottom: 5px; }
+        .message-content strong { color: #000; font-weight: 700; }
         
-        /* Tables Professional Style */
-        table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.9em; background: white; border-radius: 4px; overflow: hidden; }
-        th { background-color: #E2E8F0; color: #334155; font-weight: 600; text-transform: uppercase; font-size: 0.8em; padding: 10px; border-bottom: 2px solid #CBD5E1; text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #E2E8F0; color: #334155; }
-        tr:last-child td { border-bottom: none; }
+        /* Tablas Profesionales */
+        .message-content table { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 0.9em; background: white; border-radius: 4px; overflow: hidden; }
+        .message-content th { background-color: #E2E8F0; color: #334155; font-weight: 600; text-transform: uppercase; font-size: 0.8em; padding: 10px; border-bottom: 2px solid #CBD5E1; text-align: left; }
+        .message-content td { padding: 10px; border-bottom: 1px solid #E2E8F0; color: #334155; }
+        .message-content tr:last-child td { border-bottom: none; }
         
-        blockquote { border-left: 4px solid #38BDF8; margin: 10px 0; padding-left: 15px; color: #64748B; font-style: italic; background: #F0F9FF; padding: 10px; border-radius: 4px; }
-        small { color: #94A3B8; display: block; margin-top: 20px; font-size: 0.75em; text-align: center; }
+        .message-content blockquote { border-left: 4px solid #38BDF8; margin: 10px 0; padding-left: 15px; color: #64748B; font-style: italic; background: #F0F9FF; padding: 10px; border-radius: 4px; }
 
         /* Input Area */
         .input-area { padding: 20px; background-color: var(--bg-color); border-top: 1px solid #334155; }
@@ -205,13 +209,7 @@ HTML_TEMPLATE = """
             <div class="bot-avatar">S</div>
             <div class="message-content" style="background-color: #1E293B; color: #F1F5F9; border: none;">
                 <strong>I am here to help you generate a professional, weighted home valuation report.</strong><br>
-                Please paste the property details below.<br><br>
-                1. <strong>Full Property Address</strong> (Required)
-2. <strong>Beds / Baths / Sq Ft</strong>
-3. <strong>Condition & Upgrades</strong> (e.g., new roof 2024, remodeled kitchen)
-4. <strong>Special Features</strong> (e.g., cul-de-sac, views)
-5. <strong>Agent Name + Phone</strong> (Required for signature)
-                I will generate a professional <strong>Agent-Ready Report</strong>.
+                Please paste the property details below.
             </div>
         </div>
 
@@ -219,10 +217,10 @@ HTML_TEMPLATE = """
         <div style="background: #EF4444; color: white; padding: 10px; border-radius: 8px; text-align: center;">{{ error }}</div>
         {% endif %}
 
-        {% if generated_text %}
+        {% if generated_html %}
         <div class="message bot-message">
             <div class="bot-avatar">S</div>
-            <div class="message-content">{{ generated_text }}</div>
+            <div class="message-content">{{ generated_html | safe }}</div>
         </div>
         {% endif %}
     </div>
@@ -251,7 +249,7 @@ HTML_TEMPLATE = """
 # --- ROUTES ---
 @app.route("/", methods=["GET", "POST"])
 def home():
-    generated_text = ""
+    generated_html = "" # Cambié el nombre de la variable para ser claro
     error_message = ""
     
     if request.method == "POST":
@@ -260,15 +258,32 @@ def home():
         else:
             try:
                 user_input_block = request.form.get("user_input")
-                # Using Gemini 2.0 Flash Exp for speed and logic
+                
+                # 1. Obtener fecha actual
+                now = datetime.now()
+                # Formato legible: Enero 06, 2026
+                current_date_str = now.strftime("%B %d, %Y")
+                
+                # 2. Generar respuesta con Gemini
                 model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                response = model.generate_content(get_simon_prompt(user_input_block))
-                generated_text = response.text
+                # Pasamos la fecha a la función del prompt
+                prompt = get_simon_prompt(user_input_block, current_date_str)
+                response = model.generate_content(prompt)
+                raw_markdown = response.text
+                
+                # 3. CONVERTIR MARKDOWN A HTML LIMPIO
+                # Esto transforma **texto** en <strong>texto</strong> y las tablas en <table>
+                generated_html = markdown.markdown(raw_markdown, extensions=['tables'])
+                
             except Exception as e:
                 error_message = f"Error: {str(e)}"
 
-    return render_template_string(HTML_TEMPLATE, generated_text=generated_text, error=error_message)
+    # Pasamos generated_html al template en lugar de generated_text
+    return render_template_string(HTML_TEMPLATE, generated_html=generated_html, error=error_message)
 
 if __name__ == "__main__":
     app.run(debug=True)
+if __name__ == "__main__":
+    app.run(debug=True)
+
 
