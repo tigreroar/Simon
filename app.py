@@ -122,7 +122,6 @@ def get_strategist_prompt(user_raw_input, current_date):
     """
 
 # --- FRONTEND (PROFESSIONAL DARK UI) ---
-# Se agregó el filtro | safe en el template para renderizar HTML real
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -252,34 +251,36 @@ HTML_TEMPLATE = """
 # --- ROUTES ---
 @app.route("/", methods=["GET", "POST"])
 def home():
-    generated_html = "" # Cambié el nombre de la variable para ser claro
+    generated_html = "" 
     error_message = ""
     
     if request.method == "POST":
         if not api_key:
-            error_message = "Error: GOOGLE_API_KEY missing."
+            error_message = "Error: GOOGLE_API_KEY missing. Please add it to your environment variables."
         else:
             try:
                 user_input_block = request.form.get("user_input")
                 
                 # 1. Obtener fecha actual
                 now = datetime.now()
-                # Formato legible: Enero 06, 2026
                 current_date_str = now.strftime("%B %d, %Y")
                 
                 # 2. Generar respuesta con Gemini
-                model = genai.GenerativeModel('gemini-2.0-flash-exp')
-                # Pasamos la fecha a la función del prompt
+                model = genai.GenerativeModel('gemini-2.5-flash')
                 prompt = get_strategist_prompt(user_input_block, current_date_str)
                 response = model.generate_content(prompt)
                 raw_markdown = response.text
                 
                 # 3. CONVERTIR MARKDOWN A HTML LIMPIO
-                # Esto transforma **texto** en <strong>texto</strong> y las tablas en <table>
                 generated_html = markdown.markdown(raw_markdown, extensions=['tables'])
                 
             except Exception as e:
                 error_message = f"Error: {str(e)}"
 
-    # Pasamos generated_html al template en lugar de generated_text
-    return render_template_string(HTML_TEMPLATE, generated_html=generated_html
+    return render_template_string(HTML_TEMPLATE, generated_html=generated_html, error=error_message)
+
+if __name__ == "__main__":
+    # Toma el puerto que Railway le asigne, o usa el 5000 localmente
+    port = int(os.environ.get("PORT", 5000))
+    # host="0.0.0.0" es clave para exponer la app en producción
+    app.run(host="0.0.0.0", port=port, debug=False)
